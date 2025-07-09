@@ -234,6 +234,19 @@ int editorRowCxToRx(erow* row, int cx){
     return rx;
 }
 
+int editorRowRxToCx(erow* row, int rx){
+    int cur_rx = 0;
+    int cx;
+    for(cx=0; cx<row->size; cx++){
+        if(row->chars[cx] == '\t'){
+            cur_rx += (KILO_TAB_STOP - 1) - (cur_rx % KILO_TAB_STOP);
+        }
+        cur_rx++;
+        if(cur_rx>rx) return cx;
+    }
+    return cx;
+}
+
 void editorRowInsertChar(erow* row, int idx, int c){
     if(idx<0 || idx>row->size) idx = row->size;
     row->chars = realloc(row->chars, row->size+2);
@@ -385,9 +398,22 @@ void editorSave(){
     editorSetStatusMessage("Cannot Save! I/0 Error: %s", strerror(errno));
 }
 
-
-
-
+/* Find */
+void editorFind(){
+    char* query = editorPrompt("Search: %s (ESC to cancel)");
+    if(query==NULL) return;
+    for(int i=0; i<E.numrows; i++){
+        erow* row = &E.row[i];
+        char* match = strstr(row->render, query);
+        if(match){
+            E.cy = i;
+            E.cx = editorRowRxToCx(row, match - row->render);
+            E.rowoff = E.numrows;
+            break;
+        }
+    }
+    free(query);
+}
 
 /* Append Buffer */
 
@@ -644,6 +670,9 @@ void editorProcessKeypress(){
             if(E.cy<E.numrows)
                 E.cx = E.row[E.cy].size;
             break;
+        case CTRL_KEY('f'):
+            editorFind();
+            break;
 
         case DEL_KEY:
         case CTRL_KEY('h'):
@@ -687,8 +716,6 @@ void initEditor(){
     if(getWindowSize(&E.screenrows, &E.screencols)==-1) die("getWindowSize");
     E.screenrows -= 2; //status bar and status msg space
 }
-
-
 
 int main(int argc, char* argv[]){
     enableRawMode();
